@@ -1,0 +1,211 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+// Servir la interfaz web
+app.use(express.static(path.join(__dirname)));
+
+let jugadores = [];
+let indiceActual = 0;
+let enJuego = false;
+
+// 20 PREGUNTAS SOBRE MODALIDADES DE EXPORTACIÓN (NORMATIVA ADUANERA)
+const preguntasOriginales = [
+  "¿En qué consiste la Exportación Definitiva de mercancías?",
+  "Menciona 3 productos que estén prohibidos exportar como Muestras sin Valor Comercial.",
+  "¿Cuál es el monto límite anual FOB permitido para exportar Muestras sin Valor Comercial?",
+  "¿En qué consiste la Exportación Temporal para Reimportación en el Mismo Estado?",
+  "¿Cuál es el plazo máximo de permanencia autorizado para la Reimportación en el Mismo Estado y cuánto puede prorrogarse?",
+  "¿Qué es la Exportación Temporal para Perfeccionamiento Pasivo y cuál es su objetivo principal?",
+  "¿Cuál es el plazo máximo inicial y la prórroga máxima para el Perfeccionamiento Pasivo en el exterior?",
+  "¿Cuáles son las 4 formas de finalizar la Exportación Temporal para Perfeccionamiento Pasivo?",
+  "¿En qué consiste la modalidad de Exportación de Menaje de Casa?",
+  "¿Qué plazo se tiene para presentar la Solicitud de Autorización de Embarque del Menaje de Casa antes o después de salir del país?",
+  "¿Cuáles son los límites de valor (en USD) y peso máximo permitidos en el régimen de Tráfico Postal?",
+  "Menciona los 3 documentos soporte obligatorios que el Operador Postal debe conservar por 5 años.",
+  "¿Qué documentos impresos o correspondencia pueden embarcarse únicamente con el Manifiesto de Tráfico Postal sin hacer Solicitud de Autorización de Embarque?",
+  "¿Qué requisito deben cumplir los bienes del Patrimonio Cultural de la Nación para ser exportados temporalmente por un viajero?",
+  "¿En qué consiste el régimen de Envíos de Entrega Rápida o Mensajería Expresa?",
+  "Menciona 3 de los 4 documentos soporte obligatorios para la Solicitud de Autorización de Embarque en Mensajería Expresa.",
+  "¿Qué trámite debe realizar un viajero ante la aduana a su salida si desea reimportar sus mercancías sin pagar tributos?",
+  "¿Cuáles son las fechas límite permitidas para enviar el equipaje no acompañado de un viajero (antes y después del viaje)?",
+  "Menciona 3 de los 5 Documentos Soporte generales requeridos antes de presentar la Solicitud de Autorización de Embarque (SAE).",
+  "Menciona las 3 formas en que puede finalizar el régimen de Exportación Temporal para Reimportación en el Mismo Estado."
+];
+
+// Arreglo dinámico para agotar y reiniciar las preguntas
+let preguntasDisponibles = [...preguntasOriginales];
+
+io.on('connection', (socket) => {
+  console.log('Jugador conectado:', socket.id);
+
+  socket.on('unirse', (nombre) => {
+    jugadores.push({ id: socket.id, nombre });
+    io.emit('actualizarJugadores', jugadores);
+  });
+
+  socket.on('iniciarJuego', () => {
+    if (jugadores.length < 2 || enJuego) return;
+    enJuego = true;
+    indiceActual = 0;
+
+    // Tiempo aleatorio de la ronda entre 10 y 25 segundos
+    const tiempoTango = Math.floor(Math.random() * 15000) + 10000;
+
+    const intervaloTingo = setInterval(() => {
+      indiceActual = (indiceActual + 1) % jugadores.length;
+      io.emit('estadoPelota', { poseedor: jugadores[indiceActual] });
+    }, 800);
+
+    setTimeout(() => {
+      clearInterval(intervaloTingo);
+      enJuego = false;
+
+      // Si se agotan las preguntas, se reinicia la lista completa
+      if (preguntasDisponibles.length === 0) {
+        preguntasDisponibles = [...preguntasOriginales];
+      }
+
+      // Selecciona una pregunta al azar y la remueve para no repetirla
+      const indicePregunta = Math.floor(Math.random() * preguntasDisponibles.length);
+      const preguntaElegida = preguntasDisponibles.splice(indicePregunta, 1)[0];
+
+      io.emit('tangoFinal', {
+        perdedor: jugadores[indiceActual],
+        penitencia: preguntaElegida
+      });
+    }, tiempoTango);
+  });
+
+  socket.on('disconnect', () => {
+    jugadores = jugadores.filter(j => j.id !== socket.id);
+    io.emit('actualizarJugadores', jugadores);
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tingo Tango - Modalidades de Exportación</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #121212; color: white; padding: 20px; }
+    .card { background: #1e1e1e; border-radius: 16px; padding: 25px; margin: 20px auto; max-width: 420px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    h1 { color: #e63946; margin-bottom: 5px; font-size: 24px; }
+    h3 { color: #4cc9f0; margin-top: 0; font-size: 15px; font-weight: 400; }
+    input { padding: 12px; width: 80%; border-radius: 8px; border: 1px solid #333; margin-bottom: 10px; font-size: 16px; text-align: center; background: #2b2b2b; color: white; outline: none; }
+    button { background: #e63946; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 85%; }
+    button:hover { background: #d62828; }
+    .pelota { font-size: 1.8rem; color: #ffb703; font-weight: bold; margin-top: 15px; }
+    .penitencia { background: #2b2b2b; border-left: 4px solid #e63946; padding: 15px; margin-top: 15px; border-radius: 6px; text-align: left; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>TINGO TANGO 🤾</h1>
+    <h3>Modalidades de Exportación</h3>
+
+    <div id="registro">
+      <input type="text" id="nombreInput" placeholder="Ingresa tu nombre">
+      <br>
+      <button onclick="unirme()">Unirme a la Sala</button>
+    </div>
+
+    <div id="pantallaJuego" style="display:none;">
+      <h2 id="estado">Esperando inicio...</h2>
+      <div id="poseedor" class="pelota">---</div>
+      <div id="seccionPenitencia" class="penitencia" style="display:none;">
+        <strong>Pregunta / Reto:</strong>
+        <p id="textoPenitencia"></p>
+      </div>
+      <br><br>
+      <button onclick="iniciar()">¡Iniciar Ronda!</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function reproducirSonidoTingo() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function reproducirSonidoTango() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+    }
+
+    function unirme() {
+      const nombre = document.getElementById('nombreInput').value.trim();
+      if (nombre) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        socket.emit('unirse', nombre);
+        document.getElementById('registro').style.display = 'none';
+        document.getElementById('pantallaJuego').style.display = 'block';
+      }
+    }
+
+    function iniciar() {
+      socket.emit('iniciarJuego');
+    }
+
+    socket.on('estadoPelota', (data) => {
+      document.getElementById('seccionPenitencia').style.display = 'none';
+      document.getElementById('estado').innerText = 'Tingo, tingo, tingo...';
+      document.getElementById('poseedor').innerText = '👉 ' + data.poseedor.nombre;
+      reproducirSonidoTingo();
+    });
+
+    socket.on('tangoFinal', (data) => {
+      document.getElementById('estado').innerText = '¡TANGO! 🛑';
+      document.getElementById('poseedor').innerText = 'Le tocó a: ' + data.perdedor.nombre;
+      document.getElementById('textoPenitencia').innerText = data.penitencia;
+      document.getElementById('seccionPenitencia').style.display = 'block';
+      reproducirSonidoTango();
+    });
+  </script>
+</body>
+</html>
+{
+  "name": "tingo-tango-exportaciones",
+  "version": "1.0.0",
+  "description": "Tingo Tango Modalidades de Exportacion",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
+  }
+}
