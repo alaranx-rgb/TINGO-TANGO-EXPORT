@@ -11,7 +11,7 @@
     h1 { color: #e63946; margin-bottom: 5px; font-size: 24px; }
     h3 { color: #4cc9f0; margin-top: 0; font-size: 15px; font-weight: 400; }
     input { padding: 12px; width: 80%; border-radius: 8px; border: 1px solid #333; margin-bottom: 10px; font-size: 16px; text-align: center; background: #2b2b2b; color: white; outline: none; }
-    button { background: #e63946; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 85%; }
+    button { background: #e63946; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 85%; margin-top: 8px; }
     button:hover { background: #d62828; }
     .pelota { font-size: 1.8rem; color: #ffb703; font-weight: bold; margin-top: 15px; }
     .penitencia { background: #2b2b2b; border-left: 4px solid #e63946; padding: 15px; margin-top: 15px; border-radius: 6px; text-align: left; }
@@ -23,10 +23,8 @@
     <h1>TINGO TANGO 🤾</h1>
     <h3>Modalidades de Exportación</h3>
 
-    <!-- Audio cargado dinámicamente -->
-    <audio id="musica" loop preload="auto">
-      <source src="https://files.catbox.moe/97a2s2.mp3" type="audio/mpeg">
-    </audio>
+    <!-- Reproductor de audio con URL directa -->
+    <audio id="musica" loop preload="auto" src="https://files.catbox.moe/97a2s2.mp3"></audio>
 
     <div id="registro">
       <input type="text" id="nombreInput" placeholder="Ingresa tu nombre">
@@ -43,23 +41,33 @@
       </div>
       <br><br>
       <button onclick="iniciar()">¡Iniciar Ronda!</button>
+      <button onclick="probarAudio()" style="background:#2a9d8f;">🎵 Activar / Probar Sonido</button>
     </div>
   </div>
 
   <script>
     const socket = io();
     const musica = document.getElementById('musica');
-    musica.volume = 1.0;
+
+    function activarAudio() {
+      musica.play().then(() => {
+        musica.pause();
+        musica.currentTime = 0;
+      }).catch(err => console.log("Permiso de audio requerido"));
+    }
+
+    function probarAudio() {
+      if (musica.paused) {
+        musica.play();
+      } else {
+        musica.pause();
+      }
+    }
 
     function unirme() {
       const nombre = document.getElementById('nombreInput').value.trim();
       if (nombre) {
-        // Desbloquear audio en el navegador
-        musica.play().then(() => {
-          musica.pause();
-          musica.currentTime = 0;
-        }).catch(e => console.log("Permiso de audio solicitado"));
-
+        activarAudio();
         socket.emit('unirse', nombre);
         document.getElementById('registro').style.display = 'none';
         document.getElementById('pantallaJuego').style.display = 'block';
@@ -67,6 +75,7 @@
     }
 
     function iniciar() {
+      activarAudio();
       socket.emit('iniciarJuego');
     }
 
@@ -75,13 +84,10 @@
       document.getElementById('estado').innerText = 'Tingo, tingo, tingo...';
       document.getElementById('poseedor').innerText = '👉 ' + data.poseedor.nombre;
 
-      if (musica.paused) {
-        musica.play().catch(e => console.log("Error al reproducir audio:", e));
-      }
+      musica.play().catch(e => console.log("Error de reproducción:", e));
     });
 
     socket.on('tangoFinal', (data) => {
-      // Detener música al instante al caer el TANGO
       musica.pause();
       musica.currentTime = 0;
 
