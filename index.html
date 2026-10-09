@@ -23,6 +23,9 @@
     <h1>TINGO TANGO 🤾</h1>
     <h3>Modalidades de Exportación</h3>
 
+    <!-- Pista de audio local desde la raíz de Render/GitHub -->
+    <audio id="musica" loop preload="auto" src="se-vale-todo.mp3"></audio>
+
     <div id="registro">
       <input type="text" id="nombreInput" placeholder="Ingresa tu nombre">
       <br>
@@ -43,61 +46,19 @@
 
   <script>
     const socket = io();
+    const musica = document.getElementById('musica');
 
-    // Contexto de Audio Nativo del Navegador (Sin dependencias externas)
-    let audioCtx;
-
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
-
-    function sonarTingo() {
-      initAudio();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, audioCtx.currentTime); // Tono A4
-      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-      
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-      
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.15);
-    }
-
-    function sonarTango() {
-      initAudio();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(180, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.8);
-      
-      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
-      
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.8);
+    function habilitarAudio() {
+      musica.play().then(() => {
+        musica.pause();
+        musica.currentTime = 0;
+      }).catch(e => console.log("Permiso de audio habilitado"));
     }
 
     function unirme() {
       const nombre = document.getElementById('nombreInput').value.trim();
       if (nombre) {
-        initAudio();
+        habilitarAudio();
         socket.emit('unirse', nombre);
         document.getElementById('registro').style.display = 'none';
         document.getElementById('pantallaJuego').style.display = 'block';
@@ -105,7 +66,7 @@
     }
 
     function iniciar() {
-      initAudio();
+      habilitarAudio();
       socket.emit('iniciarJuego');
     }
 
@@ -113,15 +74,20 @@
       document.getElementById('seccionPenitencia').style.display = 'none';
       document.getElementById('estado').innerText = 'Tingo, tingo, tingo...';
       document.getElementById('poseedor').innerText = '👉 ' + data.poseedor.nombre;
-      sonarTingo();
+
+      if (musica.paused) {
+        musica.play().catch(e => console.log("Esperando interacción para reproducir"));
+      }
     });
 
     socket.on('tangoFinal', (data) => {
+      musica.pause();
+      musica.currentTime = 0;
+
       document.getElementById('estado').innerText = '¡TANGO! 🛑';
       document.getElementById('poseedor').innerText = 'Le tocó a: ' + data.perdedor.nombre;
       document.getElementById('textoPenitencia').innerText = data.penitencia;
       document.getElementById('seccionPenitencia').style.display = 'block';
-      sonarTango();
     });
   </script>
 </body>
